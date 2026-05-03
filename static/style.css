@@ -149,3 +149,76 @@ body {
     color: rgba(255,255,255,0.6);
     line-height: 1.6;
 }
+
+/* Dashboard hero section */
+.dashboard-hero {
+    padding: 60px 0 40px;
+    text-align: center;
+}
+
+/* Dashboard title */
+.dashboard-title {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin-bottom: 12px;
+}
+
+/* Dashboard subtitle */
+.dashboard-subtitle {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Email cards container */
+.email-list {
+    padding: 20px 0 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Individual email card */
+.email-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+/* Secondary button for logout */
+.btn-secondary {
+    display: inline-block;
+    background-color: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    text-decoration: none;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Secondary button hover */
+.btn-secondary:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #FFFFFF;
+}
+
+/* Header flex layout for logo and button */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Empty state message */
+.empty-state {
+    text-align: center;
+    padding: 60px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 16px;
+}

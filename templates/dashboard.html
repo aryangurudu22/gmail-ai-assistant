@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Page metadata -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Gmail AI Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Main wrapper -->
+    <div class="container">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">Gmail AI Assistant</div>
+            <a href="/logout" class="btn-secondary">Disconnect Gmail</a>
+        </header>
+
+        <!-- Dashboard hero -->
+        <section class="dashboard-hero">
+            <h1 class="dashboard-title">Your Email Summary</h1>
+            <p class="dashboard-subtitle">AI analysis of your unread emails</p>
+        </section>
+
+        <!-- Email list -->
+        <section class="email-list">
+            {% if messages %}
+                {% for message in messages %}
+                <div class="email-card">
+                    <p>Message ID: {{ message.id }}</p>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No unread emails found.</p>
+                </div>
+            {% endif %}
+        </section>
+
+    </div>
+</body>
+</html>
