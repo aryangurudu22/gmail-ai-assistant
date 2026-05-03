@@ -1,0 +1,151 @@
+/* ============================================
+   GLOBAL STYLES — applies to the entire page
+   ============================================ */
+
+/* Remove default browser spacing and use border-box sizing */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Body — sets the foundation for the entire page */
+body {
+    background-color: #0A0F2C;
+    color: #FFFFFF;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* Container — centers content and limits width for better readability */
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    
+}
+
+/* Header — styles the main title */
+.header {
+    padding : 24px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* logo — styles the logo image */
+.logo {
+    font-size: 20px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: -0.5px;
+}
+
+/*hero section — styles the main content area */
+.hero {
+    text-align: center;
+    padding: 100px 0 80px;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+/* hero badge - badge above the headline */
+.hero-badge {
+    display: inline-block;
+    background-color: rgba(37,99,235,0.2);
+    color: #93C5FD;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 100px;
+    border: 1px solid rgba(37,99,235,0.4);
+    margin-bottom: 24px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* hero headline — styles the main headline */
+.hero-title {
+    font-size: 64px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -2px;
+    margin-bottom: 24px;
+    color:#FFFFFF;
+}
+
+/* hero subtitle — styles the supporting text below the headline */
+.hero-subtitle {
+    font-size: 18px;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.7;
+    margin-bottom: 40px;
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* priimary button — styles the main call-to-action button */
+.btn-primary {
+    display: inline-block;
+    background-color: #2563EB;
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 600;
+    padding : 16px 36px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    cursor: pointer;
+}
+/* Button hover effect */
+.btn-primary:hover {
+    background-color: #1D4ED8;
+    transform: translateY(-2px);
+}
+
+/* small note below the button */
+.hero-note {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 8px;
+}
+
+/* feature section — styles the area showcasing key features */
+.features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding : 80px 0;
+}
+
+/* feature card — styles each individual feature box */
+.feature-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 32px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+/* feature card hover effect */
+.feature-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(37,99,235,0.5);
+}
+/*feature icon — styles the icon at the top of each feature card */
+.feature-icon {
+    font-size: 32px;
+    margin-bottom: 16px;
+}
+/*card title — styles the title of each feature */
+.feature-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #FFFFFF;
+    margin-bottom: 8px;
+}
+/* card description — styles the supporting text for each feature */
+.feature-card p {
+    font-size: 15px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.6;
+}
