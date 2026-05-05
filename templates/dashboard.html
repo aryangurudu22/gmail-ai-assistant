@@ -25,17 +25,64 @@
 
         <!-- Email list -->
         <section class="email-list">
-            {% if messages %}
-                {% for message in messages %}
-                <div class="email-card">
-                    <p>Message ID: {{ message.id }}</p>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <p>No unread emails found.</p>
-                </div>
-            {% endif %}
+            <!-- Loop through each email and display its content -->
+<!-- Loop through each email and display its content and AI analysis -->
+{% if emails %}
+    {% for email in emails %}
+    <!-- Individual email card -->
+    <div class="email-card {% if email.spam == 'Spam' %}spam-card{% endif %}">
+
+        <!-- Email header — sender and date -->
+        <div class="email-header">
+            <!-- Who sent this email -->
+            <span class="email-sender">{{ email.sender }}</span>
+            <!-- When it was sent -->
+            <span class="email-date">{{ email.date }}</span>
+        </div>
+
+        <!-- Email subject line -->
+        <h3 class="email-subject">{{ email.subject }}</h3>
+
+        <!-- AI analysis badges — priority, spam status, response needed -->
+        <div class="email-badges">
+
+            <!-- Priority badge — colour changes based on priority level -->
+            <span class="badge priority-{{ email.priority | lower }}">
+                {{ email.priority }}
+            </span>
+
+            <!-- Spam status badge -->
+            <span class="badge spam-{{ email.spam | lower }}">
+                {{ email.spam }}
+            </span>
+
+            <!-- Response needed badge -->
+            <span class="badge response-{{ email.response_needed | lower }}">
+                Response: {{ email.response_needed }}
+            </span>
+
+        </div>
+
+        <!-- AI generated summary of the email -->
+        <div class="email-summary">
+            <p class="summary-label">Summary</p>
+            <p class="summary-text">{{ email.summary }}</p>
+        </div>
+
+        <!-- Action required section -->
+        <div class="email-action">
+            <p class="action-label">Action Required</p>
+            <p class="action-text">{{ email.action_required }}</p>
+        </div>
+
+    </div>
+    {% endfor %}
+
+{% else %}
+    <div class="empty-state">
+        <p>No unread emails found. You are all caught up.</p>
+    </div>
+{% endif %}
         </section>
 
     </div>
