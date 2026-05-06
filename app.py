@@ -20,7 +20,8 @@ load_dotenv()
 
 # Allow OAuth to work over HTTP on localhost during development only
 # Remove this line when deploying to production
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+if os.environ.get("FLASK_ENV") != "production":
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 # These pull your Mumbai database credentials from the .env file
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -185,7 +186,7 @@ def login():
         # gmail.readonly means read only — we cannot send or delete emails
         scopes=["https://www.googleapis.com/auth/gmail.readonly"],
         # Redirect URI is where Google sends the user after they log in
-        redirect_uri="http://localhost:5000/callback"
+        redirect_uri="https://gmail-ai-assistant.up.railway.app/callback"
     )
 
     # Generate the Google login URL and a state token for security
@@ -214,7 +215,7 @@ def callback():
     flow = Flow.from_client_secrets_file(
         "client_secret.json",
        scopes=["https://www.googleapis.com/auth/gmail.readonly"],
-        redirect_uri="http://localhost:5000/callback",
+        redirect_uri="https://gmail-ai-assistant.up.railway.app/callback",
         state=state
     )
 
