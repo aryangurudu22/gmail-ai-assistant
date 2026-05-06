@@ -8,6 +8,15 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+   <div id="loader-container">
+    <div class="spinner"></div>
+    <div class="loader-text">
+        <h2>Your emails are being analysed by AI...</h2>
+        <p>This usually takes about 15-20 seconds. Please wait.</p>
+    </div>
+</div>
+
+
     <!-- Main wrapper -->
     <div class="container">
 
@@ -25,10 +34,32 @@
 
         <!-- Email list -->
         <section class="email-list">
-            <!-- Loop through each email and display its content -->
-<!-- Loop through each email and display its content and AI analysis -->
+            <!-- The Summary Scoreboard Section -->
+<div class="summary-container">
+    
+    <div class="summary-card urgent">
+        <h3 class="summary-label">Urgent</h3>
+        <p class="summary-count">{{ urgent_count }}</p>
+    </div>
+
+    <div class="summary-card normal">
+        <h3 class="summary-label">Normal</h3>
+        <p class="summary-count">{{ normal_count }}</p>
+    </div>
+
+    <div class="summary-card low">
+        <h3 class="summary-label">Low</h3>
+        <p class="summary-count">{{ low_count }}</p>
+    </div>
+
+</div>
+        <!-- Loop through each email and display its content -->
+        <!-- Loop through each email and display its content and AI analysis -->
 {% if emails %}
     {% for email in emails %}
+
+    <!-- Clicking anywhere on this card opens the real email in Gmail -->
+         <a href="{{ email.gmail_link }}" target="_blank" style="text-decoration: none; color: inherit;">
     <!-- Individual email card -->
     <div class="email-card {% if email.spam == 'Spam' %}spam-card{% endif %}">
 
@@ -60,6 +91,7 @@
             <span class="badge response-{{ email.response_needed | lower }}">
                 Response: {{ email.response_needed }}
             </span>
+        
 
         </div>
 
@@ -76,6 +108,7 @@
         </div>
 
     </div>
+    </a>
     {% endfor %}
 
 {% else %}
@@ -86,5 +119,13 @@
         </section>
 
     </div>
+    <script>
+    // This script waits for the browser to finish loading the dashboard data
+    // once the data is ready, it hides the loading screen automatically.
+    window.addEventListener('load', function() {
+        const loader = document.getElementById('loader-container');
+        loader.style.display = 'none';
+    });
+</script>
 </body>
 </html>

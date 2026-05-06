@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, redirect, url_for, request
+from flask import Flask, render_template, session, redirect, url_for, request, jsonify
 from dotenv import load_dotenv
 # OAuth flow manager — handles the entire Google login process
 from google_auth_oauthlib.flow import Flow
@@ -9,8 +9,10 @@ from google.oauth2.credentials import Credentials
 # Handles refreshing access tokens when they expire
 import google.auth.transport.requests
 import os
+import requests 
 # Groq AI client — used to analyse each email with AI
 from groq import Groq
+from dateutil import parser # date parsing library to handle different email date formats
 
 
 # Load environment variables from .env file into memory
@@ -19,6 +21,21 @@ load_dotenv()
 # Allow OAuth to work over HTTP on localhost during development only
 # Remove this line when deploying to production
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
+# These pull your Mumbai database credentials from the .env file
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# This is the direct API endpoint for the 'emails' table we created
+TABLE_URL = f"{SUPABASE_URL}/rest/v1/emails"
+
+# These headers act as your digital keys to enter the database
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal" # Tells Supabase to just confirm 'OK' without sending back the whole data
+}
 
 # Create the Flask application instance
 app = Flask(__name__)
@@ -30,7 +47,38 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 # Initialize the Groq AI client with the API key from environment variables
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-def analyse_email(sender,subject,body):
+def save_to_memory(sender, subject, analysis_dict, user_email, message_id, raw_date):
+    # Professional Date Parsing (Permanent Fix for NULL dates)
+    try:
+        clean_date = parser.parse(raw_date).isoformat()
+    except Exception:
+        clean_date = None 
+
+    email_data = {
+        "user_email": str(user_email), # No more hardcoding
+        "message_id": str(message_id),
+        "sender": str(sender),
+        "subject": str(subject),
+        "date": clean_date, 
+        "priority": str(analysis_dict.get("priority", "Normal")),
+        "spam": str(analysis_dict.get("spam", "Legitimate")),
+        "summary": str(analysis_dict.get("summary", "No summary")),
+        "action_required": str(analysis_dict.get("action_required", "None")),
+        "response_needed": str(analysis_dict.get("response_needed", "No")),
+        "gmail_link": f"https://mail.google.com/mail/u/0/#inbox/{message_id}"
+    }
+    
+    try:
+        response = requests.post(TABLE_URL, headers=HEADERS, json=email_data, timeout=10)
+        if response.status_code in [200, 201]:
+            print(f"✅ SECURE SYNC: {subject}")
+        else:
+            print(f"❌ DB ERROR: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"❌ CONNECTION ERROR: {e}")
+
+
+def analyse_email(sender,subject,body,user_email, message_id, raw_date):
     """Analyse a single email using Groq Ai and return a structured analysis.
     Takes the sender, subject and body of the email as input
     Retuens a dictionary containing the priority, spam status, summary and required actions"""
@@ -93,6 +141,8 @@ def analyse_email(sender,subject,body):
     #Extract the ai response text
     ai_response =  response.choices[0].message.content
 
+    
+
     #parse the ai text as json response into the python dictionary 
     #the ai is instructed to only respond in json so we can parse itt directy
 
@@ -100,6 +150,12 @@ def analyse_email(sender,subject,body):
     try:
         #try to parse the response as json
         analysis = json.loads(ai_response)
+
+        # --- TRIGGER MEMORY SYNC ---
+        # If the analysis was successful, save it to the database
+        # We now pass the whole dictionary instead of the raw text
+        save_to_memory(sender, subject, analysis,user_email, message_id, raw_date)
+
     except json.JSONDecodeError:
         #if parsing fails at any instance return a safe default analysis
         #this ensures that even if one email fails to be analysed the app doesnt crash
@@ -151,15 +207,13 @@ def login():
 # Callback route — Google redirects here after user logs in and grants permission
 @app.route("/callback")
 def callback():
-    # Read state directly from the URL Google sends back
-    # This is more reliable than reading from session on Python 3.14
     state = request.args.get("state")
+    # PROFESSIONAL FIX: Prevents "Scope Change" warnings from crashing the app
+    os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
-    # Recreate the OAuth flow with same settings as login route
-    # We pass the state so Google can verify this is a legitimate callback
     flow = Flow.from_client_secrets_file(
         "client_secret.json",
-        scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+       scopes=["https://www.googleapis.com/auth/gmail.readonly"],
         redirect_uri="http://localhost:5000/callback",
         state=state
     )
@@ -186,13 +240,37 @@ def callback():
     }
     # Mark session as modified so Flask saves the changes
     session.modified = True
-
+    # Fetch user info from Google to identify the email address
+    user_info_service = build("oauth2", "v2", credentials=credentials)
+    user_info = user_info_service.userinfo().get().execute()
+    session['user'] = {'email': user_info['email']}
     # Redirect user to dashboard now that they are logged in
     return redirect(url_for("dashboard"))
+
+
+def get_existing_memory(message_id):
+    """
+    Checks Supabase to see if this email was already analyzed.
+    """
+    # Search the table for this specific Gmail Message ID
+    url = f"{TABLE_URL}?message_id=eq.{message_id}"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=5)
+        data = response.json()
+        if data and len(data) > 0:
+            return data[0]  # Found it! Return the saved data
+    except Exception as e:
+        print(f"⚠️ Database Search Error: {e}")
+    return None # Not found
+
 
 # Dashboard route — shows the AI analysis of the user's emails
 @app.route("/dashboard")
 def dashboard():
+    # Pull the actual logged-in user email from the session
+    user_info = session.get('user', {})
+    actual_email = user_info.get('email', 'unknown_user')
+
     # Route guard — if user is not logged in send them back to home page
     if "credentials" not in session:
         return redirect(url_for("index"))
@@ -218,7 +296,8 @@ def dashboard():
         userId="me",
         labelIds=["UNREAD"],  # Only fetch unread emails
         maxResults=10,  # Limit to 10 emails for now
-        q = "in:inbox" # Only search for emails in the inbox, not sent or archived emails
+        q="is:unread"
+        #q = "in:inbox newer_than:2d",  # Only fetch unread mail from the last 2 days
     ).execute()
 
     # Get the list of message ID objects — each one looks like {"id": "abc123"}
@@ -470,9 +549,18 @@ def dashboard():
         # Step 5 — Send the email content to Groq AI for analysis
         # This calls our analyse_email function which returns a structured dictionary
         # containing the priority, spam status, summary and required actions for this email
-        time.sleep(2)# Add a short delay between AI calls to avoid hitting rate limits and give a better user experience
-        analysis = analyse_email(sender, subject, body[:3000])
+        # Check if we already have this email in Supabase to save tokens
+        existing_data = get_existing_memory(msg['id'])
 
+        if existing_data:
+            print(f"💾 MEMORY HIT: {subject}")
+            analysis = existing_data 
+        else:
+            try:
+                analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
+            except Exception as e:
+                print(f"⚠️ Rate Limit: Skipping {subject}")
+            continue # This tells the code to move to the next email instead of crashing
         # Step 6 — Package the email data and analysis together
         # We combine the raw email data and the AI analysis into a single dictionary
         # This makes it easy to display everything together in the dashboard template
@@ -480,7 +568,9 @@ def dashboard():
             "subject": subject,
             "sender": sender,
             "date": date,
-            "body": body[:3000],
+            "body": body[:1250],
+            "gmail_link": f"https://mail.google.com/mail/u/0/#inbox/{msg['id']}",  # Direct link to this exact email in Gmail
+
 
             # AI analysis results
             "priority": analysis.get("priority", "Normal"),
@@ -499,8 +589,24 @@ def dashboard():
     # Emails with unknown priority go to the end with default value 99
     emails.sort(key=lambda x: priority_order.get(x["priority"], 99))
 
+    #Now we pass them through the dashboard to display the counts aswell
+    #create three empty buckets for each priority level starting at zero to hold the counts
+    urgent_count = 0
+    normal_count = 0
+    low_count = 0
+
+    #loop through the emaails in our final sorted list and count how many emails fall into each priority level
+    for email in emails:
+        if email["priority"] == "Urgent":
+            urgent_count += 1
+        elif email["priority"] == "Normal":
+            normal_count += 1
+        elif email["priority"] == "Low":
+            low_count += 1
+
+
     # Pass the complete list of emails to the dashboard template to display
-    return render_template("dashboard.html", emails=emails)
+    return render_template("dashboard.html", emails=emails, urgent_count=urgent_count, normal_count=normal_count, low_count=low_count)
 
 # Logout route — clears the session and redirects to home page
 @app.route("/logout")
@@ -510,8 +616,24 @@ def logout():
     # Send user back to home page
     return redirect(url_for("index"))
 
+
+
 # Run the app only when this file is executed directly — not when imported
 if __name__ == "__main__":
+    # --- AUTOMATIC CONNECTION TEST ---
+    print("\nAttempting to connect to Cloud Brain...")
+    try:
+        # We perform a tiny "ping" by asking for 1 ID from your table
+        test_response = requests.get(TABLE_URL, headers=HEADERS, params={"select": "id", "limit": 1})
+        
+        if test_response.status_code == 200:
+            print("✅ SUCCESS: Your script is connected to Supabase!")
+        else:
+            print(f"❌ DATABASE ERROR: {test_response.status_code} - {test_response.text}")
+            print("Check your .env keys and table name.")
+            
+    except Exception as e:
+        print(f"❌ CONNECTION FAILED: {e}")
     # Start the Flask development server with debug mode enabled
     # debug=True auto-restarts on code changes and shows detailed errors
     app.run(debug=True)
