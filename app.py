@@ -13,6 +13,8 @@ import requests
 # Groq AI client — used to analyse each email with AI
 from groq import Groq
 from dateutil import parser # date parsing library to handle different email date formats
+import json
+
 
 
 # Load environment variables from .env file into memory
@@ -180,8 +182,9 @@ def index():
 @app.route("/login")
 def login():
     # Create OAuth flow using credentials from client_secret.json
-    flow = Flow.from_client_secrets_file(
-        "client_secret.json",
+    client_config = json.loads(os.getenv("GOOGLE_CLIENT_SECRET"))
+    flow = Flow.from_client_config(
+        client_config,
         # Scopes define what permissions we are requesting from Google
         # gmail.readonly means read only — we cannot send or delete emails
         scopes=["https://www.googleapis.com/auth/gmail.readonly"],
@@ -212,9 +215,10 @@ def callback():
     # PROFESSIONAL FIX: Prevents "Scope Change" warnings from crashing the app
     os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
-    flow = Flow.from_client_secrets_file(
-        "client_secret.json",
-       scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+    client_config = json.loads(os.getenv("GOOGLE_CLIENT_SECRET"))
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=["https://www.googleapis.com/auth/gmail.readonly"],
         redirect_uri="https://gmail-ai-assistant.up.railway.app/callback",
         state=state
     )
