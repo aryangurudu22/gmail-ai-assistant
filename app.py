@@ -182,7 +182,10 @@ def index():
 @app.route("/login")
 def login():
     # Create OAuth flow using credentials from client_secret.json
-    client_config = json.loads(os.getenv("GOOGLE_CLIENT_SECRET"))
+    google_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not google_secret:
+        return "Server misconfiguration: GOOGLE_CLIENT_SECRET env var is missing.", 500
+    client_config = json.loads(google_secret)
     flow = Flow.from_client_config(
         client_config,
         # Scopes define what permissions we are requesting from Google
@@ -216,7 +219,10 @@ def callback():
     # PROFESSIONAL FIX: Prevents "Scope Change" warnings from crashing the app
     os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
-    client_config = json.loads(os.getenv("GOOGLE_CLIENT_SECRET"))
+    google_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not google_secret:
+        return "Server misconfiguration: GOOGLE_CLIENT_SECRET env var is missing.", 500
+    client_config = json.loads(google_secret)
     flow = Flow.from_client_config(
         client_config,
         scopes=["https://www.googleapis.com/auth/gmail.readonly"],
@@ -242,7 +248,7 @@ def callback():
         "token_uri": credentials.token_uri,
         "client_id": credentials.client_id,
         "client_secret": credentials.client_secret,
-        "scopes": credentials.scopes
+        "scopes": list(credentials.scopes) if credentials.scopes else []
     }
     # Mark session as modified so Flask saves the changes
     session.modified = True
@@ -566,7 +572,12 @@ def dashboard():
                 analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
             except Exception as e:
                 print(f"⚠️ Rate Limit: Skipping {subject}")
-            continue # This tells the code to move to the next email instead of crashing
+                continue  # FIXED: continue is now INSIDE the except block — only skips on error
+        
+        # Guard: skip if analysis is somehow None
+        if not analysis:
+            continue
+
         # Step 6 — Package the email data and analysis together
         # We combine the raw email data and the AI analysis into a single dictionary
         # This makes it easy to display everything together in the dashboard template
