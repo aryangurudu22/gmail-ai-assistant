@@ -190,7 +190,9 @@ def login():
         client_config,
         # Scopes define what permissions we are requesting from Google
         # gmail.readonly means read only — we cannot send or delete emails
-        scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+        scopes=["https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/userinfo.email",
+                "openid"],
         # Redirect URI is where Google sends the user after they log in
         redirect_uri="https://gmail-ai-assistant.up.railway.app/callback"
     )
@@ -215,38 +217,71 @@ def login():
 # Callback route — Google redirects here after user logs in and grants permission
 @app.route("/callback")
 def callback():
-    state = request.args.get("state")
-    # PROFESSIONAL FIX: Prevents "Scope Change" warnings from crashing the app
+    # Prevent "Scope Change" warnings from crashing the app
     os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
+    # If Google returned an error (e.g. user denied access), redirect home
+    if request.args.get("error"):
+        return redirect(url_for("index"))
+
+    state = request.args.get("state")
 
     google_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     if not google_secret:
         return "Server misconfiguration: GOOGLE_CLIENT_SECRET env var is missing.", 500
+
     client_config = json.loads(google_secret)
     flow = Flow.from_client_config(
         client_config,
-        scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+        scopes=["https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/userinfo.email",
+                "openid"],
         redirect_uri="https://gmail-ai-assistant.up.railway.app/callback",
         state=state
     )
 
-    # Exchange the authorisation code Google sent for a real access token
-    # This is the most important step — without this we cannot read emails
-    flow.fetch_token(
-    authorization_response=request.url,
-    client_secret=flow.client_config["client_secret"]
-)
-
-    # Get the credentials object containing access token and refresh token
-    credentials = flow.credentials
-
-    # Guard: if refresh_token is missing, force user to re-authenticate
-    # This happens when Google skips sending refresh_token for previously authorized accounts
-    if not credentials.refresh_token:
+    # Exchange the authorisation code for real tokens
+    try:
+        flow.fetch_token(authorization_response=request.url)
+    except Exception as e:
+        print(f"❌ Token fetch error: {e}")
         return redirect(url_for("login"))
 
-    # Store credentials in session as a dictionary so user stays logged in
-    # We store as dictionary because the Credentials object cannot be serialised directly
+    # Get the credentials object
+    credentials = flow.credentials
+
+    # Guard: if refresh_token is missing, revoke and force clean re-auth
+    if not credentials.refresh_token:
+        print("⚠️ No refresh_token received — redirecting to force consent")
+        return redirect(url_for("login"))
+
+    # Get user email directly from the token's id_token claims (no extra API call needed)
+    # Fallback to userinfo API if id_token not available
+    user_email = None
+    try:
+        import google.auth.transport.requests as google_requests
+        from google.oauth2 import id_token as google_id_token
+        request_session = google_requests.Request()
+        id_info = google_id_token.verify_oauth2_token(
+            credentials.id_token,
+            request_session,
+            credentials.client_id
+        )
+        user_email = id_info.get("email")
+    except Exception:
+        pass
+
+    # Fallback: use userinfo API if id_token parsing failed
+    if not user_email:
+        try:
+            user_info_service = build("oauth2", "v2", credentials=credentials)
+            user_info = user_info_service.userinfo().get().execute()
+            user_email = user_info.get("email", "unknown_user")
+        except Exception as e:
+            print(f"⚠️ Could not fetch user email: {e}")
+            user_email = "unknown_user"
+
+    # Store credentials in session
     session["credentials"] = {
         "token": credentials.token,
         "refresh_token": credentials.refresh_token,
@@ -255,13 +290,9 @@ def callback():
         "client_secret": credentials.client_secret,
         "scopes": list(credentials.scopes) if credentials.scopes else []
     }
-    # Mark session as modified so Flask saves the changes
+    session['user'] = {'email': user_email}
     session.modified = True
-    # Fetch user info from Google to identify the email address
-    user_info_service = build("oauth2", "v2", credentials=credentials)
-    user_info = user_info_service.userinfo().get().execute()
-    session['user'] = {'email': user_info['email']}
-    # Redirect user to dashboard now that they are logged in
+
     return redirect(url_for("dashboard"))
 
 
