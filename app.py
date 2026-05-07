@@ -198,7 +198,8 @@ def login():
         # even when the user is not actively using the app
         access_type="offline",
         # Do not ask for permissions the user has already granted
-        include_granted_scopes="true"
+        include_granted_scopes="true",
+        prompt="select_account"  # Forces Google to always show account selection screen
     )
 
     # Save state in session as a backup — we also read it from URL in callback
