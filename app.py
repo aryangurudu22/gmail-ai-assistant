@@ -202,7 +202,7 @@ def login():
         access_type="offline",
         # Do not ask for permissions the user has already granted
         include_granted_scopes="true",
-        prompt="select_account"  # Forces Google to always show account selection screen
+        prompt="consent"  # Forces Google to always return a refresh_token
     )
 
     # Save state in session as a backup — we also read it from URL in callback
@@ -239,6 +239,11 @@ def callback():
 
     # Get the credentials object containing access token and refresh token
     credentials = flow.credentials
+
+    # Guard: if refresh_token is missing, force user to re-authenticate
+    # This happens when Google skips sending refresh_token for previously authorized accounts
+    if not credentials.refresh_token:
+        return redirect(url_for("login"))
 
     # Store credentials in session as a dictionary so user stays logged in
     # We store as dictionary because the Credentials object cannot be serialised directly
