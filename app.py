@@ -325,14 +325,34 @@ def dashboard():
 
     # Rebuild the Credentials object from the dictionary stored in session
     # We need a proper Credentials object to make Gmail API calls
+    creds_data = session["credentials"]
+
+    # Force re-login if gmail scope is missing (e.g. old session before scope fix)
+    required_scope = "https://www.googleapis.com/auth/gmail.readonly"
+    stored_scopes = creds_data.get("scopes", [])
+    if required_scope not in stored_scopes:
+        session.clear()
+        return redirect(url_for("login"))
+
     credentials = Credentials(
-        token=session["credentials"]["token"],
-        refresh_token=session["credentials"]["refresh_token"],
-        token_uri=session["credentials"]["token_uri"],
-        client_id=session["credentials"]["client_id"],
-        client_secret=session["credentials"]["client_secret"],
-        scopes=session["credentials"]["scopes"]
+        token=creds_data["token"],
+        refresh_token=creds_data["refresh_token"],
+        token_uri=creds_data["token_uri"],
+        client_id=creds_data["client_id"],
+        client_secret=creds_data["client_secret"],
+        scopes=creds_data["scopes"]
     )
+
+    # Refresh token if expired
+    if credentials.expired and credentials.refresh_token:
+        try:
+            credentials.refresh(google.auth.transport.requests.Request())
+            session["credentials"]["token"] = credentials.token
+            session.modified = True
+        except Exception as e:
+            print(f"❌ Token refresh failed: {e}")
+            session.clear()
+            return redirect(url_for("login"))
 
     # Build the Gmail API client using the credentials
     # "v1" means version 1 of the Gmail API
