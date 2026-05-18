@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail AI Assistant — Enter Access Code</title>
+    <style>
+        /* Full page centered layout */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* The white card in the center */
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        /* Title styling */
+        h1 {
+            font-size: 22px;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        /* Subtitle styling */
+        p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        /* Input box styling */
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+            margin-bottom: 16px;
+            text-align: center;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Input focus state */
+        input:focus {
+            outline: none;
+            border-color: #4285f4;
+        }
+
+        /* Submit button */
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        /* Button hover state */
+        button:hover {
+            background-color: #3367d6;
+        }
+
+        /* Error message - hidden by default */
+        .error {
+            color: #d93025;
+            font-size: 14px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        /* Show error when it has content */
+        .error.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Gmail AI Assistant</h1>
+        <p>Enter your access code to continue</p>
+
+        <!-- The form that sends the code to Flask -->
+        <form method="POST" action="/verify-code">
+            <input
+                type="text"
+                name="access_code"
+                placeholder="ENTER CODE"
+                required
+                autocomplete="off"
+            />
+            <button type="submit">Continue</button>
+        </form>
+
+        <!-- Error message shown when code is wrong -->
+        {% if error %}
+        <div class="error visible">{{ error }}</div>
+        {% endif %}
+    </div>
+</body>
+</html>

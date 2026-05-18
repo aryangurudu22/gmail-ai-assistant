@@ -32,6 +32,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 # This is the direct API endpoint for the 'emails' table we created
 TABLE_URL = f"{SUPABASE_URL}/rest/v1/emails"
 
+# This is the direct API endpoint for the access_codes table
+# Think of it as the address of our guest list in the database
+ACCESS_CODES_URL = f"{SUPABASE_URL}/rest/v1/access_codes"
+
 # These headers act as your digital keys to enter the database
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -49,6 +53,41 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # Initialize the Groq AI client with the API key from environment variables
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+def verify_access_code(code):
+    """
+    Checks if the entered access code exists in Supabase and is active.
+
+    WHAT: Takes the code the user typed, searches the access_codes table,
+    and checks if that code exists AND has active = true.
+
+    WHY: Codes live in Supabase so you can add, remove, or deactivate
+    them from the dashboard at any time without touching this code.
+
+    Returns True if valid and active. Returns False if not found or deactivated.
+    """
+    try:
+        # Build the Supabase query — eq. means "equals"
+        # We search for the exact code AND require active = true
+        # .strip() removes any accidental spaces, .upper() makes it case-insensitive
+        url = f"{ACCESS_CODES_URL}?code=eq.{code.strip().upper()}&active=eq.true"
+
+        # Ask Supabase to search for this code
+        response = requests.get(url, headers=HEADERS, timeout=5)
+
+        # Supabase returns a list — if it has at least one item, code is valid
+        data = response.json()
+        if data and len(data) > 0:
+            print(f"✅ ACCESS CODE VALID: {code}")
+            return True
+        else:
+            print(f"❌ ACCESS CODE INVALID: {code}")
+            return False
+
+    except Exception as e:
+        # If Supabase is unreachable — deny access to be safe, never crash
+        print(f"❌ ACCESS CODE CHECK ERROR: {e}")
+        return False
 
 def save_to_memory(sender, subject, analysis_dict, user_email, message_id, raw_date):
     # Professional Date Parsing (Permanent Fix for NULL dates)
@@ -112,9 +151,10 @@ def analyse_email(sender,subject,body,user_email, message_id, raw_date):
                 {
                 "priority": "Urgent" or "Normal" or "Low",
                 "spam": "spam" or "Legitimate",
-                "summary": "A clear 3 to 4 sentences summary covering the what that email is about, who sent it, what they want, any important details and any dedalines mentioned",
-                "action_required": "One Specific clear Action that the recipient needs to take , or 'No action required' if no action is needed",
-                "response_needed": "Yes" or "No"
+                "summary": "A clear 3 to 4 sentences summary covering what the email is about, who sent it, what they want, any important details and any deadlines mentioned",
+                "action_required": "One specific clear action that the recipient needs to take, or 'No action required' if no action is needed",
+                "response_needed": "Yes" or "No",
+                "draft_reply": "A professional, concise reply of 3 to 5 sentences written in first person as if you are the recipient. Write only the reply body — no subject line, no greeting header. If response_needed is No, return an empty string here."
                 }
                 
                 Priority rules:
@@ -172,15 +212,65 @@ def analyse_email(sender,subject,body,user_email, message_id, raw_date):
     return analysis
 
 
-# Home page route — the first page a user sees when they visit the app
+# Home page route — NOW shows the access code entry page first
 @app.route("/")
 def index():
-    # Find index.html in the templates folder and send it to the user's browser
-    return render_template("index.html")
+    """
+    WHAT: First page a user sees when they visit your app URL.
+    WHY: We never show Google login to someone who has not paid.
+    The access code is Gate 1. Google login is Gate 2.
+
+    If the user already passed the code check this session,
+    we skip straight to Google login — they only enter code once per session.
+    """
+    # Check if this user already passed the access code check this session
+    # session is Flask's temporary memory for each visitor
+    if session.get("access_granted"):
+        return redirect(url_for("login"))
+
+    # First visit — show the access code entry page
+    return render_template("enter_code.html")
+
+
+# Verify code route — receives and checks the code the user typed
+@app.route("/verify-code", methods=["POST"])
+def verify_code():
+    """
+    WHAT: Handles the form submission from the access code page.
+    WHY: When user types their code and clicks Continue, this route
+    receives it, checks Supabase, and either lets them through or
+    shows an error.
+
+    methods=["POST"] means this only accepts form submissions —
+    nobody can reach it by typing the URL directly in the browser.
+    """
+    # Get the code the user typed — strip removes spaces, upper makes it case-insensitive
+    entered_code = request.form.get("access_code", "").strip().upper()
+
+    # Empty submission — send back with error
+    if not entered_code:
+        return render_template("enter_code.html", error="Please enter your access code.")
+
+    # Check the code against our Supabase access_codes table
+    if verify_access_code(entered_code):
+        # Valid code — mark this session as approved
+        # This flag means they will not be asked for the code again this session
+        session["access_granted"] = True
+        session.modified = True  # Tell Flask the session changed so it saves it
+
+        # Send them to Google login — they passed Gate 1
+        return redirect(url_for("login"))
+    else:
+        # Invalid code — send back to code page with a clear error message
+        return render_template("enter_code.html", error="Invalid access code. Please check your code and try again.")
 
 # Login route — builds Google OAuth URL and redirects user to Google login page
 @app.route("/login")
 def login():
+    # Security guard — block anyone who has not passed the access code check
+    # This prevents bypassing the code page by typing /login directly in the browser
+    if not session.get("access_granted"):
+        return redirect(url_for("index"))
     # Create OAuth flow using credentials from client_secret.json
     google_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     if not google_secret:
@@ -318,6 +408,11 @@ def dashboard():
     # Pull the actual logged-in user email from the session
     user_info = session.get('user', {})
     actual_email = user_info.get('email', 'unknown_user')
+
+    # Security guard — if access code not verified, send back to start
+    # This prevents bypassing the code page by typing /dashboard directly
+    if not session.get("access_granted"):
+        return redirect(url_for("index"))
 
     # Route guard — if user is not logged in send them back to home page
     if "credentials" not in session:
@@ -637,6 +732,38 @@ def dashboard():
         # Step 6 — Package the email data and analysis together
         # We combine the raw email data and the AI analysis into a single dictionary
         # This makes it easy to display everything together in the dashboard template
+        # Extract the sender's email address only — needed for Gmail compose URL
+        # The sender field often looks like "John Smith <john@example.com>"
+        # We extract just the email part between < and > for the mailto link
+        # If no angle brackets exist, use the full sender string as-is
+        import re as re_module
+        sender_email_match = re_module.search(r'<(.+?)>', sender)
+        sender_email = sender_email_match.group(1) if sender_email_match else sender
+
+        # Get the draft reply from the analysis — empty string if not needed
+        draft_reply = analysis.get("draft_reply", "")
+
+        # Determine if a reply is needed — normalise to uppercase for safe comparison
+        response_needed = analysis.get("response_needed", "NO").upper()
+
+        # Build the Gmail compose URL only when a reply is actually needed
+        # This URL opens Gmail with To, Subject and Body already pre-filled
+        # The client clicks one button and Gmail is ready to send — no copy pasting
+        if response_needed == "YES" and draft_reply:
+            # urllib.parse.quote encodes special characters in the draft reply
+            # so they survive being placed inside a URL without breaking it
+            import urllib.parse
+            gmail_compose_url = (
+                f"https://mail.google.com/mail/?view=cm"
+                f"&to={urllib.parse.quote(sender_email)}"
+                f"&su={urllib.parse.quote('Re: ' + subject)}"
+                f"&body={urllib.parse.quote(draft_reply)}"
+            )
+        else:
+            # No reply needed — leave the compose URL empty
+            # The dashboard template will hide the reply button when this is empty
+            gmail_compose_url = ""
+
         emails.append({
             "subject": subject,
             "sender": sender,
@@ -644,13 +771,19 @@ def dashboard():
             "body": body[:1250],
             "gmail_link": f"https://mail.google.com/mail/u/0/#inbox/{msg['id']}",  # Direct link to this exact email in Gmail
 
-
             # AI analysis results
             "priority": analysis.get("priority", "Normal"),
             "spam": analysis.get("spam", "Legitimate"),
             "summary": analysis.get("summary", "No summary available"),
             "action_required": analysis.get("action_required", "No action required"),
-            "response_needed": analysis.get("response_needed", "NO")
+            "response_needed": response_needed,
+
+            # Draft reply text — populated by AI only when response is needed
+            "draft_reply": draft_reply,
+
+            # Gmail compose URL — pre-fills To, Subject, Body in Gmail compose window
+            # Empty string when no reply needed — dashboard hides button in that case
+            "gmail_compose_url": gmail_compose_url
         })
 
     # Sort emails by priority — Urgent first, then Normal, then Low

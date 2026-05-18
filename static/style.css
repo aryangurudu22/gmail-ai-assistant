@@ -460,3 +460,40 @@ body {
     color: #333;
     text-align: center;
 }
+
+/* Draft reply container — sits below action required on each card */
+.email-draft-reply {
+    margin-top: 14px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid #4285f4;
+    border-radius: 6px;
+}
+
+/* The AI written draft reply text */
+.draft-reply-text {
+    font-size: 14px;
+    color: #ccc;
+    line-height: 1.6;
+    margin: 6px 0 14px 0;
+    font-style: italic;
+}
+
+/* Reply in Gmail button */
+.btn-reply {
+    display: inline-block;
+    padding: 8px 18px;
+    background-color: #4285f4;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+/* Button hover state */
+.btn-reply:hover {
+    background-color: #3367d6;
+    color: white;
+}

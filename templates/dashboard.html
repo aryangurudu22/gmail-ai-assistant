@@ -107,6 +107,27 @@
             <p class="action-text">{{ email.action_required }}</p>
         </div>
 
+        <!-- Draft reply section — only shown when AI says a response is needed -->
+        <!-- gmail_compose_url is empty when no reply needed, so this stays hidden -->
+        {% if email.gmail_compose_url %}
+        <div class="email-draft-reply" onclick="event.stopPropagation()">
+            <!-- stopPropagation stops the card click from firing when clicking this section -->
+
+            <!-- The draft reply text written by AI -->
+            <p class="action-label">AI Draft Reply</p>
+            <p class="draft-reply-text">{{ email.draft_reply }}</p>
+
+            <!-- One click opens Gmail with To, Subject and Body pre-filled -->
+            <!-- target="_blank" opens in a new tab so dashboard stays open -->
+            <a href="{{ email.gmail_compose_url }}"
+               target="_blank"
+               class="btn-reply"
+               onclick="event.stopPropagation()">
+                ✉ Reply in Gmail
+            </a>
+        </div>
+        {% endif %}
+
     </div>
     </a>
     {% endfor %}
