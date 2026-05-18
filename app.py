@@ -212,23 +212,46 @@ def analyse_email(sender,subject,body,user_email, message_id, raw_date):
     return analysis
 
 
-# Home page route — NOW shows the access code entry page first
+# Home page route — goes straight to Google login
+# Access code check happens AFTER login, before dashboard
 @app.route("/")
 def index():
     """
     WHAT: First page a user sees when they visit your app URL.
-    WHY: We never show Google login to someone who has not paid.
-    The access code is Gate 1. Google login is Gate 2.
+    WHY: Google login feels familiar and trusted to clients.
+    After login, we verify their access code before showing any data.
+    Gate 1 = Google Login. Gate 2 = Access Code. Gate 3 = Dashboard.
 
-    If the user already passed the code check this session,
-    we skip straight to Google login — they only enter code once per session.
+    If already logged in and access granted, skip straight to dashboard.
     """
-    # Check if this user already passed the access code check this session
-    # session is Flask's temporary memory for each visitor
+    # Already fully authenticated — send straight to dashboard
+    if session.get("credentials") and session.get("access_granted"):
+        return redirect(url_for("dashboard"))
+
+    # Otherwise start with Google login
+    return redirect(url_for("login"))
+
+
+# Access code page route — shown after Google login
+# GET request — just displays the enter_code.html page
+@app.route("/enter-code")
+def verify_code_page():
+    """
+    WHAT: Shows the access code entry page after Google login.
+    WHY: Client has proved who they are via Google.
+    Now we check they are a paying client before showing their emails.
+
+    If they already have a valid code this session, skip to dashboard.
+    """
+    # Already has a valid code this session — skip to dashboard
     if session.get("access_granted"):
+        return redirect(url_for("dashboard"))
+
+    # Must be logged in to reach this page — if not, back to login
+    if "credentials" not in session:
         return redirect(url_for("login"))
 
-    # First visit — show the access code entry page
+    # Show the access code entry page
     return render_template("enter_code.html")
 
 
@@ -244,6 +267,11 @@ def verify_code():
     methods=["POST"] means this only accepts form submissions —
     nobody can reach it by typing the URL directly in the browser.
     """
+    # Guard — must be logged in via Google before submitting access code
+    # If someone posts directly to /verify-code without logging in, send them to login
+    if "credentials" not in session:
+        return redirect(url_for("login"))
+
     # Get the code the user typed — strip removes spaces, upper makes it case-insensitive
     entered_code = request.form.get("access_code", "").strip().upper()
 
@@ -258,8 +286,8 @@ def verify_code():
         session["access_granted"] = True
         session.modified = True  # Tell Flask the session changed so it saves it
 
-        # Send them to Google login — they passed Gate 1
-        return redirect(url_for("login"))
+        # Send them to dashboard — they passed Gate 2
+        return redirect(url_for("dashboard"))
     else:
         # Invalid code — send back to code page with a clear error message
         return render_template("enter_code.html", error="Invalid access code. Please check your code and try again.")
@@ -267,10 +295,6 @@ def verify_code():
 # Login route — builds Google OAuth URL and redirects user to Google login page
 @app.route("/login")
 def login():
-    # Security guard — block anyone who has not passed the access code check
-    # This prevents bypassing the code page by typing /login directly in the browser
-    if not session.get("access_granted"):
-        return redirect(url_for("index"))
     # Create OAuth flow using credentials from client_secret.json
     google_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     if not google_secret:
@@ -383,7 +407,9 @@ def callback():
     session['user'] = {'email': user_email}
     session.modified = True
 
-    return redirect(url_for("dashboard"))
+    # After successful Google login, redirect to access code entry
+    # The client must enter their paid access code before seeing any data
+    return redirect(url_for("verify_code_page"))
 
 
 def get_existing_memory(message_id):
