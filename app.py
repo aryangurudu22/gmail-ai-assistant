@@ -457,10 +457,11 @@ def dashboard():
     # This only gives us the ID of each email, not the full content yet
     results = gmail_service.users().messages().list(
         userId="me",
-        labelIds=["UNREAD"],  # Only fetch unread emails
-        maxResults=10,  # Limit to 10 emails for now
-        q="is:unread"
-        #q = "in:inbox newer_than:2d",  # Only fetch unread mail from the last 2 days
+        # category:primary filters to primary inbox only — excludes promotions, social, updates tabs
+        # newer_than:7d fetches only emails from the last 7 days
+        # is:unread ensures we only show unread emails the client has not read yet
+        maxResults=15,  # Show up to 15 emails per dashboard load
+        q="is:unread category:primary newer_than:7d"
     ).execute()
 
     # Get the list of message ID objects — each one looks like {"id": "abc123"}
