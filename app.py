@@ -784,6 +784,8 @@ def dashboard():
             if not draft_reply and cached_priority in ["Urgent", "Normal"]:
                 print(f"🔄 REBUILDING DRAFT: {subject}")
                 try:
+                    import time
+                    time.sleep(3)  # Prevent Groq rate limit when rebuilding multiple drafts
                     fresh_analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
                     draft_reply = fresh_analysis.get("draft_reply", "")
                     analysis = existing_data  # Keep original analysis — only update draft
