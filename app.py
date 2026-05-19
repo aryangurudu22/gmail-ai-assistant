@@ -771,6 +771,10 @@ def dashboard():
         # Check if we already have this email in Supabase to save tokens
         existing_data = get_existing_memory(msg['id'])
 
+        # Initialise both variables — they get set either from cache or from fresh analysis below
+        draft_reply = ""
+        gmail_compose_url = ""
+
         if existing_data:
             print(f"💾 MEMORY HIT: {subject}")
             analysis = existing_data
@@ -786,8 +790,26 @@ def dashboard():
                 try:
                     import time
                     time.sleep(3)  # Prevent Groq rate limit when rebuilding multiple drafts
-                    fresh_analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
-                    draft_reply = fresh_analysis.get("draft_reply", "")
+
+                    # Call Groq directly to get only the draft reply
+                    # We do NOT call analyse_email here because that would
+                    # try to INSERT a new Supabase row and cause a duplicate key error
+                    draft_prompt = f"""You are an email reply writer.
+Write a professionally formatted email reply for the following email.
+Structure: greeting, 2-3 paragraph body, professional sign-off.
+Return ONLY the reply text — no JSON, no explanation.
+
+From: {sender}
+Subject: {subject}
+Body: {body[:1250]}"""
+
+                    draft_response = groq_client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": draft_prompt}],
+                        temperature=0.3,
+                        max_tokens=500
+                    )
+                    draft_reply = draft_response.choices[0].message.content.strip()
                     analysis = existing_data  # Keep original analysis — only update draft
                 except Exception as e:
                     print(f"⚠️ Draft rebuild failed: {e}")
@@ -803,48 +825,42 @@ def dashboard():
         if not analysis:
             continue
 
-        # Step 6 — Package the email data and analysis together
-        # We combine the raw email data and the AI analysis into a single dictionary
-        # This makes it easy to display everything together in the dashboard template
-        # Extract the sender's email address only — needed for Gmail compose URL
-        # The sender field often looks like "John Smith <john@example.com>"
-        # We extract just the email part between < and > for the mailto link
-        # If no angle brackets exist, use the full sender string as-is
+        # Step 6 — Build draft reply and Gmail compose URL
         import re as re_module
+        import urllib.parse
+
+        # Extract sender email address for the Gmail compose URL
+        # Sender field looks like "John Smith <john@example.com>" — we need just the email
         sender_email_match = re_module.search(r'<(.+?)>', sender)
         sender_email = sender_email_match.group(1) if sender_email_match else sender
 
-        # Get the draft reply from the analysis — empty string if not needed
-        draft_reply = analysis.get("draft_reply", "")
-
-        # Determine if a reply is needed — normalise to uppercase for safe comparison
+        # Get priority and response_needed from analysis
+        email_priority = analysis.get("priority", "Normal")
         response_needed = analysis.get("response_needed", "NO").upper()
 
-        # Build the Gmail compose URL for Urgent and Normal emails
-        # These are real emails that need real responses — always provide a draft
-        # Low priority emails are newsletters/notifications — no draft needed
-        import urllib.parse
+        # IMPORTANT: Only overwrite draft_reply and gmail_compose_url from analysis
+        # if they were NOT already set by the cache block above.
+        # The cache block sets draft_reply directly from Groq or from Supabase.
+        # We must not overwrite those values here.
+        if not draft_reply:
+            # Fresh analysis — get draft_reply from Groq response
+            draft_reply = analysis.get("draft_reply", "")
 
-        # Get priority from analysis — normalise to title case for safe comparison
-        email_priority = analysis.get("priority", "Normal")
+        if not gmail_compose_url:
+            # Build compose URL for Urgent and Normal emails
+            # Low priority emails are newsletters/notifications — no reply button needed
+            if email_priority in ["Urgent", "Normal"] and draft_reply:
+                gmail_compose_url = (
+                    f"https://mail.google.com/mail/?view=cm"
+                    f"&to={urllib.parse.quote(sender_email)}"
+                    f"&su={urllib.parse.quote('Re: ' + subject)}"
+                    f"&body={urllib.parse.quote(draft_reply)}"
+                )
+            else:
+                gmail_compose_url = ""
 
-        # Build compose URL for Urgent and Normal regardless of response_needed field
-        # This is more reliable than depending on response_needed from cached Supabase data
-        if email_priority in ["Urgent", "Normal"] and draft_reply:
-            # urllib.parse.quote encodes special characters so the URL never breaks
-            gmail_compose_url = (
-                f"https://mail.google.com/mail/?view=cm"
-                f"&to={urllib.parse.quote(sender_email)}"
-                f"&su={urllib.parse.quote('Re: ' + subject)}"
-                f"&body={urllib.parse.quote(draft_reply)}"
-            )
-        else:
-            # Low priority or no draft — hide the reply button on dashboard
-            gmail_compose_url = ""
-
-        # Save draft_reply and gmail_compose_url back to Supabase
-        # This ensures cached emails also have the reply stored permanently
-        # Next load — memory hit returns everything including the draft
+        # Save draft_reply and gmail_compose_url to Supabase permanently
+        # So next load they come straight from cache — no rebuild needed
         if draft_reply or gmail_compose_url:
             update_memory_draft(msg['id'], draft_reply, gmail_compose_url)
 
