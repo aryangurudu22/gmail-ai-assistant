@@ -217,10 +217,9 @@ def analyse_email(sender,subject,body,user_email, message_id, raw_date):
 @app.route("/")
 def index():
     """
-    WHAT: First page a user sees when they visit your app URL.
-    WHY: Google login feels familiar and trusted to clients.
-    After login, we verify their access code before showing any data.
-    Gate 1 = Google Login. Gate 2 = Access Code. Gate 3 = Dashboard.
+    WHAT: Landing page — the first thing a user sees when visiting the app.
+    WHY: Shows the branded Connect with Gmail page with features and CTA.
+    This was the original index.html we built — restoring it properly.
 
     If already logged in and access granted, skip straight to dashboard.
     """
@@ -228,8 +227,8 @@ def index():
     if session.get("credentials") and session.get("access_granted"):
         return redirect(url_for("dashboard"))
 
-    # Otherwise start with Google login
-    return redirect(url_for("login"))
+    # Show the branded landing page with Connect Gmail button
+    return render_template("index.html")
 
 
 # Access code page route — shown after Google login
@@ -844,9 +843,9 @@ def dashboard():
 # Logout route — clears the session and redirects to home page
 @app.route("/logout")
 def logout():
-    # Remove all session data — credentials are cleared, user is logged out
+    # Remove all session data — credentials and access_granted both cleared
     session.clear()
-    # Send user back to home page
+    # Send user back to landing page — the branded Connect with Gmail page
     return redirect(url_for("index"))
 
 
