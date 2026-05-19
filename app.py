@@ -182,7 +182,7 @@ def analyse_email(sender,subject,body,user_email, message_id, raw_date):
                 "summary": "A clear 3 to 4 sentences summary covering what the email is about, who sent it, what they want, any important details and any deadlines mentioned",
                 "action_required": "One specific clear action that the recipient needs to take, or 'No action required' if no action is needed",
                 "response_needed": "Yes" or "No",
-                "draft_reply": "A professionally formatted email reply written in first person as if you are the recipient. Structure it exactly as follows: Start with a greeting (e.g. Hi [Name], or Dear [Name],), then write 2 to 3 clear paragraphs addressing the email content, then end with a professional sign-off (e.g. Best regards, or Kind regards,) followed by a placeholder name. If priority is Low and response_needed is No, return an empty string."
+                "draft_reply": "Only generate this if response_needed is Yes. Write a professionally formatted email reply in first person as the recipient. Structure: greeting (e.g. Hi [Name],), 2 to 3 clear paragraphs addressing the email, professional sign-off (e.g. Best regards,) with a placeholder name. If response_needed is No, return an empty string here."
                 }
                 
                 Priority rules:
@@ -515,7 +515,7 @@ def dashboard():
         # category:primary filters to primary inbox only — excludes promotions, social, updates tabs
         # newer_than:7d fetches only emails from the last 7 days
         # is:unread ensures we only show unread emails the client has not read yet
-        maxResults=15,  # Show up to 15 emails per dashboard load
+        maxResults=10,  # Capped at 10 to prevent Groq rate limit on fresh load
         q="is:unread category:primary newer_than:7d"
     ).execute()
 
@@ -784,8 +784,8 @@ def dashboard():
 
             # If cached email has no draft reply but is Urgent or Normal
             # it was saved before this feature existed — re-analyse just for the draft
-            cached_priority = existing_data.get("priority", "Low")
-            if not draft_reply and cached_priority in ["Urgent", "Normal"]:
+            cached_response_needed = existing_data.get("response_needed", "NO").upper()
+            if not draft_reply and cached_response_needed == "YES":
                 print(f"🔄 REBUILDING DRAFT: {subject}")
                 try:
                     import time
@@ -816,10 +816,12 @@ Body: {body[:1250]}"""
                     draft_reply = ""
         else:
             try:
+                import time
+                time.sleep(2)  # 2 second gap between each fresh Groq call — prevents rate limit
                 analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
             except Exception as e:
-                print(f"⚠️ Rate Limit: Skipping {subject}")
-                continue  # FIXED: continue is now INSIDE the except block — only skips on error
+                print(f"⚠️ Groq Error: Skipping {subject} — {e}")
+                continue
         
         # Guard: skip if analysis is somehow None
         if not analysis:
@@ -847,9 +849,9 @@ Body: {body[:1250]}"""
             draft_reply = analysis.get("draft_reply", "")
 
         if not gmail_compose_url:
-            # Build compose URL for Urgent and Normal emails
-            # Low priority emails are newsletters/notifications — no reply button needed
-            if email_priority in ["Urgent", "Normal"] and draft_reply:
+            # Build compose URL only when response is needed AND draft exists
+            # response_needed is the single source of truth — cleaner and lighter
+            if response_needed == "YES" and draft_reply:
                 gmail_compose_url = (
                     f"https://mail.google.com/mail/?view=cm"
                     f"&to={urllib.parse.quote(sender_email)}"
