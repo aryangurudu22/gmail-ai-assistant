@@ -775,9 +775,21 @@ def dashboard():
             print(f"💾 MEMORY HIT: {subject}")
             analysis = existing_data
             # Read draft_reply and gmail_compose_url from cached Supabase data
-            # These were saved on the first analysis — no need to rebuild them
             draft_reply = existing_data.get("draft_reply", "")
-            gmail_compose_url = existing_data.get("gmail_compose_url", "") 
+            gmail_compose_url = existing_data.get("gmail_compose_url", "")
+
+            # If cached email has no draft reply but is Urgent or Normal
+            # it was saved before this feature existed — re-analyse just for the draft
+            cached_priority = existing_data.get("priority", "Low")
+            if not draft_reply and cached_priority in ["Urgent", "Normal"]:
+                print(f"🔄 REBUILDING DRAFT: {subject}")
+                try:
+                    fresh_analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
+                    draft_reply = fresh_analysis.get("draft_reply", "")
+                    analysis = existing_data  # Keep original analysis — only update draft
+                except Exception as e:
+                    print(f"⚠️ Draft rebuild failed: {e}")
+                    draft_reply = ""
         else:
             try:
                 analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
