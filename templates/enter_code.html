@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gmail AI Assistant — Enter Access Code</title>
     <style>
-        /* Full page centered layout */
+        /* Full page centered layout with dark background matching dashboard */
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #0f1117;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -16,43 +16,88 @@
             margin: 0;
         }
 
-        /* The white card in the center */
-        .card {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        /* Outer wrapper for logo above card */
+        .wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
+            padding: 0 20px;
+        }
+
+        /* Brand name above the card — matches dashboard style */
+        .brand {
+            font-size: 15px;
+            font-weight: 600;
+            color: #8b8fa8;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        /* The dark card matching dashboard theme */
+        .card {
+            background: #1a1d2e;
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            width: 100%;
             text-align: center;
         }
 
-        /* Title styling */
-        h1 {
-            font-size: 22px;
-            color: #1a1a1a;
-            margin-bottom: 8px;
+        /* Lock icon at top of card — signals security to client */
+        .lock-icon {
+            font-size: 32px;
+            margin-bottom: 16px;
         }
 
-        /* Subtitle styling */
-        p {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 24px;
+        /* Main title */
+        h1 {
+            font-size: 22px;
+            color: #ffffff;
+            margin: 0 0 8px 0;
+            font-weight: 600;
+        }
+
+        /* Tagline — tells client what this tool does in one line */
+        .tagline {
+            color: #8b8fa8;
+            font-size: 13px;
+            margin: 0 0 8px 0;
+            line-height: 1.5;
+        }
+
+        /* Divider line */
+        .divider {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            margin: 20px 0;
+        }
+
+        /* Instruction text */
+        .instruction {
+            color: #8b8fa8;
+            font-size: 13px;
+            margin: 0 0 16px 0;
         }
 
         /* Input box styling */
         input {
             width: 100%;
-            padding: 12px 16px;
-            font-size: 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 14px 16px;
+            font-size: 18px;
+            background: #0f1117;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
             box-sizing: border-box;
             margin-bottom: 16px;
             text-align: center;
-            letter-spacing: 2px;
+            letter-spacing: 4px;
             text-transform: uppercase;
+            color: #ffffff;
+            font-weight: 600;
         }
 
         /* Input focus state */
@@ -61,58 +106,101 @@
             border-color: #4285f4;
         }
 
+        /* Placeholder styling */
+        input::placeholder {
+            color: #4a4f6a;
+            letter-spacing: 2px;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
         /* Submit button */
         button {
             width: 100%;
-            padding: 12px;
-            background-color: #4285f4;
+            padding: 14px;
+            background: linear-gradient(135deg, #4285f4, #3367d6);
             color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
             cursor: pointer;
+            transition: opacity 0.2s;
         }
 
         /* Button hover state */
         button:hover {
-            background-color: #3367d6;
+            opacity: 0.9;
         }
 
-        /* Error message - hidden by default */
+        /* Error message */
         .error {
-            color: #d93025;
-            font-size: 14px;
-            margin-top: 12px;
-            display: none;
+            color: #ff6b6b;
+            font-size: 13px;
+            margin-top: 14px;
+            padding: 10px;
+            background: rgba(255,107,107,0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255,107,107,0.2);
         }
 
-        /* Show error when it has content */
-        .error.visible {
-            display: block;
+        /* Security note at bottom — builds trust with client */
+        .security-note {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #4a4f6a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Gmail AI Assistant</h1>
-        <p>Enter your access code to continue</p>
+    <div class="wrapper">
 
-        <!-- The form that sends the code to Flask -->
-        <form method="POST" action="/verify-code">
-            <input
-                type="text"
-                name="access_code"
-                placeholder="ENTER CODE"
-                required
-                autocomplete="off"
-            />
-            <button type="submit">Continue</button>
-        </form>
+        <!-- Brand name above card -->
+        <div class="brand">Gmail AI Assistant</div>
 
-        <!-- Error message shown when code is wrong -->
-        {% if error %}
-        <div class="error visible">{{ error }}</div>
-        {% endif %}
+        <div class="card">
+
+            <!-- Lock icon — signals to client this is a secure, paid product -->
+            <div class="lock-icon">🔐</div>
+
+            <!-- Title -->
+            <h1>Welcome Back</h1>
+
+            <!-- One line tagline — tells client exactly what this tool does -->
+            <p class="tagline">Your AI-powered inbox assistant.<br>Analyse, prioritise, and reply to emails in seconds.</p>
+
+            <hr class="divider">
+
+            <!-- Instruction -->
+            <p class="instruction">Enter your access code to continue</p>
+
+            <!-- The form that sends the code to Flask -->
+            <form method="POST" action="/verify-code">
+                <input
+                    type="text"
+                    name="access_code"
+                    placeholder="ENTER CODE"
+                    required
+                    autocomplete="off"
+                />
+                <button type="submit">Continue →</button>
+            </form>
+
+            <!-- Error message shown when code is wrong -->
+            {% if error %}
+            <div class="error">⚠️ {{ error }}</div>
+            {% endif %}
+
+            <!-- Security note — builds trust when client sees it -->
+            <div class="security-note">
+                🔒 Secure access · Your data is never shared
+            </div>
+
+        </div>
     </div>
 </body>
 </html>
