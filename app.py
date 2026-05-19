@@ -54,6 +54,30 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 # Initialize the Groq AI client with the API key from environment variables
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+def update_memory_draft(message_id, draft_reply, gmail_compose_url):
+    """
+    WHAT: Updates an existing Supabase row with the draft reply and compose URL.
+    WHY: These two fields are built in the dashboard route AFTER analyse_email runs.
+    We save them back to Supabase so cached emails also have the draft reply stored.
+    Next time the same email loads from cache, it already has the reply ready.
+    """
+    try:
+        # PATCH updates only the specified fields — leaves everything else untouched
+        url = f"{TABLE_URL}?message_id=eq.{message_id}"
+        update_data = {
+            "draft_reply": str(draft_reply),
+            "gmail_compose_url": str(gmail_compose_url)
+        }
+        patch_headers = {**HEADERS, "Prefer": "return=minimal"}
+        response = requests.patch(url, headers=patch_headers, json=update_data, timeout=5)
+        if response.status_code in [200, 201, 204]:
+            print(f"✅ DRAFT SAVED: {message_id[:20]}")
+        else:
+            print(f"❌ DRAFT SAVE ERROR: {response.status_code}")
+    except Exception as e:
+        print(f"❌ DRAFT SAVE EXCEPTION: {e}")
+
+
 def verify_access_code(code):
     """
     Checks if the entered access code exists in Supabase and is active.
@@ -89,7 +113,7 @@ def verify_access_code(code):
         print(f"❌ ACCESS CODE CHECK ERROR: {e}")
         return False
 
-def save_to_memory(sender, subject, analysis_dict, user_email, message_id, raw_date):
+def save_to_memory(sender, subject, analysis_dict, user_email, message_id, raw_date, draft_reply="", gmail_compose_url=""):
     # Professional Date Parsing (Permanent Fix for NULL dates)
     try:
         clean_date = parser.parse(raw_date).isoformat()
@@ -107,7 +131,11 @@ def save_to_memory(sender, subject, analysis_dict, user_email, message_id, raw_d
         "summary": str(analysis_dict.get("summary", "No summary")),
         "action_required": str(analysis_dict.get("action_required", "None")),
         "response_needed": str(analysis_dict.get("response_needed", "No")),
-        "gmail_link": f"https://mail.google.com/mail/u/0/#inbox/{message_id}"
+        "gmail_link": f"https://mail.google.com/mail/u/0/#inbox/{message_id}",
+        # Save draft reply and compose URL so we never re-analyse the same email
+        # These are built after AI analysis and passed in from the dashboard route
+        "draft_reply": str(draft_reply),
+        "gmail_compose_url": str(gmail_compose_url)
     }
     
     try:
@@ -197,7 +225,9 @@ def analyse_email(sender,subject,body,user_email, message_id, raw_date):
         # --- TRIGGER MEMORY SYNC ---
         # If the analysis was successful, save it to the database
         # We now pass the whole dictionary instead of the raw text
-        save_to_memory(sender, subject, analysis,user_email, message_id, raw_date)
+        # draft_reply and gmail_compose_url are built after this function returns
+        # They are saved via update_memory_draft in the dashboard route
+        save_to_memory(sender, subject, analysis, user_email, message_id, raw_date)
 
     except json.JSONDecodeError:
         #if parsing fails at any instance return a safe default analysis
@@ -743,7 +773,11 @@ def dashboard():
 
         if existing_data:
             print(f"💾 MEMORY HIT: {subject}")
-            analysis = existing_data 
+            analysis = existing_data
+            # Read draft_reply and gmail_compose_url from cached Supabase data
+            # These were saved on the first analysis — no need to rebuild them
+            draft_reply = existing_data.get("draft_reply", "")
+            gmail_compose_url = existing_data.get("gmail_compose_url", "") 
         else:
             try:
                 analysis = analyse_email(sender, subject, body[:1250], actual_email, msg['id'], date)
@@ -793,6 +827,12 @@ def dashboard():
         else:
             # Low priority or no draft — hide the reply button on dashboard
             gmail_compose_url = ""
+
+        # Save draft_reply and gmail_compose_url back to Supabase
+        # This ensures cached emails also have the reply stored permanently
+        # Next load — memory hit returns everything including the draft
+        if draft_reply or gmail_compose_url:
+            update_memory_draft(msg['id'], draft_reply, gmail_compose_url)
 
         emails.append({
             "subject": subject,
