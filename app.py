@@ -154,7 +154,7 @@ def analyse_email(sender,subject,body,user_email, message_id, raw_date):
                 "summary": "A clear 3 to 4 sentences summary covering what the email is about, who sent it, what they want, any important details and any deadlines mentioned",
                 "action_required": "One specific clear action that the recipient needs to take, or 'No action required' if no action is needed",
                 "response_needed": "Yes" or "No",
-                "draft_reply": "A professional, concise reply of 3 to 5 sentences written in first person as if you are the recipient. Write only the reply body — no subject line, no greeting header. If response_needed is No, return an empty string here."
+                "draft_reply": "A professionally formatted email reply written in first person as if you are the recipient. Structure it exactly as follows: Start with a greeting (e.g. Hi [Name], or Dear [Name],), then write 2 to 3 clear paragraphs addressing the email content, then end with a professional sign-off (e.g. Best regards, or Kind regards,) followed by a placeholder name. If priority is Low and response_needed is No, return an empty string."
                 }
                 
                 Priority rules:
@@ -772,13 +772,18 @@ def dashboard():
         # Determine if a reply is needed — normalise to uppercase for safe comparison
         response_needed = analysis.get("response_needed", "NO").upper()
 
-        # Build the Gmail compose URL only when a reply is actually needed
-        # This URL opens Gmail with To, Subject and Body already pre-filled
-        # The client clicks one button and Gmail is ready to send — no copy pasting
-        if response_needed == "YES" and draft_reply:
-            # urllib.parse.quote encodes special characters in the draft reply
-            # so they survive being placed inside a URL without breaking it
-            import urllib.parse
+        # Build the Gmail compose URL for Urgent and Normal emails
+        # These are real emails that need real responses — always provide a draft
+        # Low priority emails are newsletters/notifications — no draft needed
+        import urllib.parse
+
+        # Get priority from analysis — normalise to title case for safe comparison
+        email_priority = analysis.get("priority", "Normal")
+
+        # Build compose URL for Urgent and Normal regardless of response_needed field
+        # This is more reliable than depending on response_needed from cached Supabase data
+        if email_priority in ["Urgent", "Normal"] and draft_reply:
+            # urllib.parse.quote encodes special characters so the URL never breaks
             gmail_compose_url = (
                 f"https://mail.google.com/mail/?view=cm"
                 f"&to={urllib.parse.quote(sender_email)}"
@@ -786,8 +791,7 @@ def dashboard():
                 f"&body={urllib.parse.quote(draft_reply)}"
             )
         else:
-            # No reply needed — leave the compose URL empty
-            # The dashboard template will hide the reply button when this is empty
+            # Low priority or no draft — hide the reply button on dashboard
             gmail_compose_url = ""
 
         emails.append({
@@ -804,11 +808,11 @@ def dashboard():
             "action_required": analysis.get("action_required", "No action required"),
             "response_needed": response_needed,
 
-            # Draft reply text — populated by AI only when response is needed
+            # Draft reply text — populated for Urgent and Normal emails
             "draft_reply": draft_reply,
 
             # Gmail compose URL — pre-fills To, Subject, Body in Gmail compose window
-            # Empty string when no reply needed — dashboard hides button in that case
+            # Empty string for Low priority — dashboard hides button in that case
             "gmail_compose_url": gmail_compose_url
         })
 
