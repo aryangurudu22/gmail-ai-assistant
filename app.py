@@ -916,6 +916,40 @@ Body: {body[:1250]}"""
     # Pass the complete list of emails to the dashboard template to display
     return render_template("dashboard.html", emails=emails, urgent_count=urgent_count, normal_count=normal_count, low_count=low_count)
 
+# Sync route — clears Supabase email cache for the current user
+# so the next dashboard load re-analyses all emails fresh
+@app.route("/sync")
+def sync():
+    """
+    WHAT: Deletes all cached emails for this user from Supabase.
+    WHY: When the client clicks Sync, they want to see their latest emails
+    re-analysed fresh — not the cached version from the last visit.
+    After clearing the cache, we redirect to dashboard which re-analyses everything.
+    """
+    # Must be logged in to sync
+    if not session.get("access_granted") or "credentials" not in session:
+        return redirect(url_for("index"))
+
+    # Get the logged in user's email so we only delete their emails
+    user_info = session.get('user', {})
+    actual_email = user_info.get('email', '')
+
+    if actual_email:
+        try:
+            # Delete only this user's cached emails — not other users' data
+            url = f"{TABLE_URL}?user_email=eq.{actual_email}"
+            response = requests.delete(url, headers=HEADERS, timeout=10)
+            if response.status_code in [200, 204]:
+                print(f"✅ SYNC: Cleared cache for {actual_email}")
+            else:
+                print(f"⚠️ SYNC WARNING: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️ SYNC ERROR: {e}")
+
+    # Redirect to dashboard — fresh analysis will run automatically
+    return redirect(url_for("dashboard"))
+
+
 # Logout route — clears the session and redirects to home page
 @app.route("/logout")
 def logout():

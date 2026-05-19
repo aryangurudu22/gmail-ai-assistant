@@ -497,3 +497,77 @@ body {
     background-color: #3367d6;
     color: white;
 }
+/* Dashboard tagline — sits below subtitle */
+.dashboard-tagline {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.35);
+    margin-top: 8px;
+    letter-spacing: 0.5px;
+}
+
+/* Sync button container */
+.sync-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+/* Sync button */
+.btn-sync {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: rgba(37, 99, 235, 0.15);
+    color: #93C5FD;
+    border: 1px solid rgba(37, 99, 235, 0.4);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+/* Sync button hover */
+.btn-sync:hover {
+    background: rgba(37, 99, 235, 0.25);
+    border-color: rgba(37, 99, 235, 0.7);
+}
+
+/* Sync note text */
+.sync-note {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Empty state — improved */
+.empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.empty-state h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 8px;
+}
+
+.empty-state p {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 4px;
+}
+
+.empty-note {
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, 0.25) !important;
+    margin-top: 12px !important;
+}

@@ -23,13 +23,14 @@
         <!-- Header -->
         <header class="header">
             <div class="logo">Gmail AI Assistant</div>
-            <a href="/logout" class="btn-secondary">Disconnect Gmail</a>
+            <a href="/logout" class="btn-secondary">Sign Out</a>
         </header>
 
         <!-- Dashboard hero -->
         <section class="dashboard-hero">
             <h1 class="dashboard-title">Your Email Summary</h1>
             <p class="dashboard-subtitle">AI analysis of your unread emails</p>
+            <p class="dashboard-tagline">Priority sorted · Draft replies ready · One click to respond</p>
         </section>
 
         <!-- Email list -->
@@ -53,6 +54,14 @@
     </div>
 
 </div>
+        <!-- Sync button — clears Supabase cache for fresh AI analysis -->
+        <div class="sync-container">
+            <button class="btn-sync" onclick="syncEmails()">
+                🔄 Sync New Emails
+            </button>
+            <span class="sync-note">Fetches and analyses your latest unread emails</span>
+        </div>
+
         <!-- Loop through each email and display its content -->
         <!-- Loop through each email and display its content and AI analysis -->
 {% if emails %}
@@ -134,19 +143,35 @@
 
 {% else %}
     <div class="empty-state">
-        <p>No unread emails found. You are all caught up.</p>
+        <div class="empty-icon">✅</div>
+        <h3>You are all caught up</h3>
+        <p>No unread emails in your primary inbox from the last 7 days.</p>
+        <p class="empty-note">New emails will appear here automatically on your next visit.</p>
     </div>
 {% endif %}
         </section>
 
     </div>
     <script>
-    // This script waits for the browser to finish loading the dashboard data
-    // once the data is ready, it hides the loading screen automatically.
+    // Hide loader when page finishes loading
     window.addEventListener('load', function() {
         const loader = document.getElementById('loader-container');
         loader.style.display = 'none';
     });
+
+    // Sync function — clears Supabase cache then reloads dashboard for fresh analysis
+    function syncEmails() {
+        // Show the loading screen with a sync message
+        const loader = document.getElementById('loader-container');
+        const loaderTitle = loader.querySelector('h2');
+        const loaderSubtitle = loader.querySelector('p');
+        loaderTitle.textContent = 'Syncing your latest emails...';
+        loaderSubtitle.textContent = 'This may take 30 to 60 seconds. Please wait.';
+        loader.style.display = 'flex';
+
+        // Call the /sync route which clears the cache and redirects to dashboard
+        window.location.href = '/sync';
+    }
 </script>
 </body>
 </html>
